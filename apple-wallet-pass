@@ -32,8 +32,8 @@ const generateWalletPass = async (req, res) => {
       },
       {
         serialNumber: `${ticketId}`,
-        description: "GX Connect Test Pass",
-        logoText: "GX Tickets",
+        description: "TX Connect Test Pass",
+        logoText: "TX Tickets",
       }
     ).then(async (newPass) => {
       newPass.primaryFields.push({
@@ -75,7 +75,7 @@ const generateWalletPass = async (req, res) => {
         `attachment; filename=ticket_${ticketId}.pkpass`
       );
       res.send(bufferData ); // 🚀 Send file directly!
-      // fs.writeFileSync(`./GXTickets_${ticketId}.pkpass`, bufferData);
+      // fs.writeFileSync(`./TXTickets_${ticketId}.pkpass`, bufferData);
     });
     // Deleting the file
     // res.status(200).send({
