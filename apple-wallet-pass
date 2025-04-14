@@ -1,0 +1,92 @@
+const fs = require("fs");
+const { PKPass } = require("passkit-generator");
+const { NewTicket, Event } = require("../../models");
+
+const generateWalletPass = async (req, res) => {
+  const { ticketId, userName } = req.body;
+  try {
+    // 🟡 Fetch NewTicket and related Event data here
+    const ticket = await NewTicket.findOne({
+      where: { id: ticketId },
+      include: [
+        {
+          model: Event,
+          as: "event",
+        },
+      ],
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ error: "Ticket not found" });
+    }
+
+    const pass = await PKPass.from(
+      {
+        model: "./wallet/passModel.pass",
+        certificates: {
+          wwdr: fs.readFileSync("./certs/wwdr.pem"),
+          signerCert: fs.readFileSync("./certs/signerCert.pem"),
+          signerKey: fs.readFileSync("./certs/signerKey.pem"),
+          signerKeyPassphrase: "Octathorn.",
+        },
+      },
+      {
+        serialNumber: `${ticketId}`,
+        description: "GX Connect Test Pass",
+        logoText: "GX Tickets",
+      }
+    ).then(async (newPass) => {
+      newPass.primaryFields.push({
+        key: "name",
+        label: "Ticket Holder",
+        value: userName,
+      });
+      newPass.secondaryFields.push({
+        key: "type",
+        label: "Ticket Type",
+        value: ticket.ticketType,
+      });
+      newPass.auxiliaryFields.push({
+        key: "code",
+        label: "Ticket Number",
+        value: ticket.code,
+      });
+      newPass.secondaryFields.push({
+        key: "cost",
+        label: "Ticket Cost",
+        value: ticket.price,
+      });
+      newPass.auxiliaryFields.push({
+        key: "location",
+        label: "Location",
+        value: ticket.event.location,
+      });
+
+      newPass.setBarcodes({
+        key: "static",
+        format: "PKBarcodeFormatQR",
+        message: ticket.qrData,
+      });
+
+      const bufferData = newPass.getAsBuffer();
+      res.setHeader("Content-Type", "application/vnd.apple.pkpass");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename=ticket_${ticketId}.pkpass`
+      );
+      res.send(bufferData ); // 🚀 Send file directly!
+      // fs.writeFileSync(`./GXTickets_${ticketId}.pkpass`, bufferData);
+    });
+    // Deleting the file
+    // res.status(200).send({
+    //   success: true,
+    //   message: "Apple Wallet Pass generated successfully",
+    //   pass: ticket,
+    // });
+  } catch (err) {
+    console.error("Wallet Pass Error:", err);
+    res.status(500).json({ error: "Failed to generate Apple Wallet pass" });
+  }
+};
+
+module.exports = { generateWalletPass };
